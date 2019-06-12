@@ -1,49 +1,124 @@
-# TK8 CLI example Addon for developer
+# TK8 addon - Traefik
 
-## Getting Started
+## What are TK8 addons?
 
-These instructions will get you all information you need to create your own tk8 addons on top of your kubernetes cluster
+- TK8 add-ons provide freedom of choice for the user to deploy tools and applications without being tied to any customized formats of deployment.
+- Simplified deployment process via CLI (will also be available via TK8 web in future).
+- With the TK8 add-ons platform, you can also build your own add-ons.
 
-### Prerequisites
+## What is Traefik?
 
-This addon was created for the tk8 cli you could find it here: https://github.com/kubernauts/tk8
-Addon integration is supported on Version 0.5.0 and greater
+Traefik is a modern HTTP reverse proxy and load balancer that makes deploying microservices easy. Traefik integrates with your existing infrastructure components ([Docker](https://www.docker.com/), [Swarm mode](https://docs.docker.com/engine/swarm/), [Kubernetes](https://kubernetes.io/), [Marathon](https://mesosphere.github.io/marathon/), [Consul](https://www.consul.io/), [Etcd](https://etcd.io/), [Rancher](https://rancher.com/), [Amazon ECS](https://aws.amazon.com/ecs/), ...) and configures itself automatically and dynamically.
 
-Alternative you can apply the main.yml directly with kubectl
+## Prerequisites
 
-## Development
+RBAC must be enabled on the Kubernetes Cluster.
 
-Create your own addons for TK8 is easy as well.
+## Get Started
 
-```bash
-./tk8 addon create my-addon
+You can install Traefik on the Kubernetes cluster via TK8 addons functionality.
+
+What do you need:
+- tk8 binary
+
+## Deploy Traefik on the Kubernetes Cluster
+
+Run:
+```
+$ tk8 addon install traefik
+Search local for traefik
+check if provided a url
+Search addon on kubernauts space.
+Cloning into 'traefik'...
+Install traefik
+execute main.sh
+Creating main.yaml
+add  ./traefik-config/01-traefik-rbac.yaml
+add  ./traefik-config/02-traefik-daemonset.yaml
+apply traefik/main.yml
+clusterrole.rbac.authorization.k8s.io/traefik-ingress-controller created
+clusterrolebinding.rbac.authorization.k8s.io/traefik-ingress-controller created
+serviceaccount/traefik-ingress-controller created
+daemonset.extensions/traefik-ingress-controller created
+service/traefik-ingress-service created
+traefik installation complete
+```
+This command will clone https://github.com/kubernauts/tk8-addon-traefik repository locally and deploy traefik.
+
+This command also creates:
+- RBAC rules essential for allowing access to resources traefik needs
+- Traefik is deployed as a daemonset
+- A Traefik service is also created
+
+## Creating an Ingress for exposing Traefik web UI
+
+We'll start by creating a Service and an Ingress resource that will expose the Traefik web UI. Create a YAML file traefik-ing-web.yaml with below contents:
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik-web-ui
+  namespace: kube-system
+spec:
+  selector:
+    k8s-app: traefik-ingress-lb
+  ports:
+  - name: web
+    port: 80
+    targetPort: 8080
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: traefik-web-ui
+  namespace: kube-system
+spec:
+  rules:
+  - host: traefik-ui.local
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: traefik-web-ui
+          servicePort: web
 ```
 
-Then you can provide the main.yml with your addon components.
-Also it is possible to add a main.sh file wich runs before the main.yml is applyed to the cluster. So you can do some more stuff or generate a main.yml from subfolder yaml files.
+Create the resources by running:
+```
+$ kubectl apply -f traefik-ing-web.yaml
+service/traefik-web-ui created
+ingress.extensions/traefik-web-ui created
+```
 
-To get more support join us on [Slack](https://kubernauts-slack-join.herokuapp.com)
+Verify if the ingress was created correctly:
+```
+$ kubectl get ing -n kube-system
+NAME             HOSTS              ADDRESS                                                                      PORTS   AGE
+traefik-web-ui   traefik-ui.local   84.200.100.197,84.200.100.199,84.200.100.201,84.200.100.203,84.200.100.205   80      21m
+```
 
-## Contributing
+Add an entry to your /etc/hosts for the traefik-ui.local URL with the value mentioned in ADDRESS field. Open traefik-ui.local in your browser and you should be greeted with the Traefik web UI.
 
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
+For more examples on name-based routing, HTTP basic authentication, TLS, visit - https://docs.traefik.io/user-guide/kubernetes/
 
-## Versioning
+## Uninstall Traefik
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
-
-## Authors
-
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
-
-See also the list of [contributors](https://github.com/kubernauts/tk8/contributors) who participated in this project.
-
-## License
-
-This project is licensed under the Apache License - see the [LICENSE.md](LICENSE.md) file for details
-
-## Acknowledgments
-
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
+For removing Traefik from your cluster, we can use TK8 addon's **destroy** functionality. Run:
+```
+$ tk8 addon destroy traefik
+Search local for traefik
+Addon traefik already exist
+Found traefik local.
+Destroying traefik
+execute main.sh
+Creating main.yaml
+add  ./traefik-config/01-traefik-rbac.yaml
+add  ./traefik-config/02-traefik-daemonset.yaml
+delete traefik from cluster
+clusterrole.rbac.authorization.k8s.io "traefik-ingress-controller" deleted
+clusterrolebinding.rbac.authorization.k8s.io "traefik-ingress-controller" deleted
+serviceaccount "traefik-ingress-controller" deleted
+daemonset.extensions "traefik-ingress-controller" deleted
+service "traefik-ingress-service" deleted
+traefik destroy complete
+```
